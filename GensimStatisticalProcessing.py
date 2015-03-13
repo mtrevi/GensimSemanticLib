@@ -10,8 +10,11 @@ URL: http://radimrehurek.com/2014/02/word2vec-tutorial/
 # %autoreload 2
 from ext.TextProcessing import *
 from gensim.models import word2vec
+from time import time
+import numpy as np
 import logging
 import sys
+import bz2
 import os
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 ##
@@ -24,87 +27,49 @@ logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=lo
 class GensimCore:
 
   def __init__(self):
-    self.load_model()
+    self.model = None
 
-
-  def load_model(self,model_path=''):
-    last_model_path = 'models/yahoo-datapack-20150103-1m-kw-adcopy.model'
-    ## Get Last model path
-    if len(model_path) == 0:
-      self.model = self.get_default_model()
-    ## Otherwise load the default models
-    else:
-      self.model = self.get_model(model_path)
+  def load_model(self, model_path):
+    logging.info('loading model [%s]' %model_path)
+    self.model = word2vec.Word2Vec.load( model_path )
     ##
-  
 
-  def get_model(self, model_path):
-    return word2vec.Word2Vec.load( model_path )
+  def store_model(self, model_path, static=True):
+    if static:
+      self.model.init_sims(replace=True)
+    self.model.save( model_path )
+    logging.info('--- saved model (%s)'%model_path)
     ##
 
 
-  ''' Return the last model (incrementally updating all the models) '''
-  def get_default_model(self):  
-    ## ========================= ##
-    ## Load text8 Corpus Dataset ##
-    DATASET = 'corpus/text8'
-    MODEL_PATH = 'models/text8.model'
-    logging.info('loading dataset [%s]' %DATASET)
-    if os.path.isfile(MODEL_PATH):
-      model = self.get_model( MODEL_PATH )
-      logging.info('\tdone [%s]' %MODEL_PATH)
-      print model
+  ''' Create or update model with the given corpus. '''
+  def train_model(self, CORPUS_PATH, update=False, min_count=5, size=100, workers=6):
+    if not os.path.isfile(CORPUS_PATH):
+      logging.error('[!] Corpus Not Found (%s)' %CORPUS_PATH)
+      return
     else:
-      sentences = word2vec.Text8Corpus(DATASET)## 
-      ## train the skip-gram model; default window=5
-      model = word2vec.Word2Vec(sentences, min_count=5) # min_count of words frequency
-      ## The size of the NN layers correspond to the “degrees” of freedom the training algorithm has.
-      ## Bigger size values require more training data, but can lead to better (more accurate) models. 
-      ## Reasonable values are in the tens to hundreds
-      model = word2vec.Word2Vec(sentences, size=100)
-      ## Set up Paralelization 
-      model = word2vec.Word2Vec(sentences, workers=6) # default = 1 worker = no parallelization
-      ## Store the model
-      model.save( MODEL_PATH )
-      logging.info('--- saved model (%s) based on %s'%(MODEL_PATH,DATASET) )
-    ## ============================ ##
-    ## Load UCL Advertising Dataset ##
-    DATASET = 'corpus/ucl-open-advertising-dataset.kw.adcopy'
-    MODEL_PATH = 'models/ucl-advertising.model'
-    logging.info('loading dataset [%s]' %DATASET)
-    if os.path.isfile(MODEL_PATH):
-      model = self.get_model( MODEL_PATH )
-      logging.info('\tdone [%s]' %MODEL_PATH)
+      if 'text8' in CORPUS_PATH: # Load standard text8 
+        sentences = word2vec.Text8Corpus(CORPUS_PATH)## 
+      else: # Load custom corpus
+        sentences = self.load_sentences_from_file(CORPUS_PATH)
+    #
+    ## Build or Update the model
+    if self.model == None:
+      logging.info('--- building model')
+      ## train the skip-gram model; default window=5 - min_count of words frequency
+      self.model = word2vec.Word2Vec(sentences, min_count=min_count) 
     else:
-      sentences = self.load_sentences_from_file(DATASET)
-      model.train(sentences)
-      ## Training
-      model = word2vec.Word2Vec(sentences, min_count=5)
-      model = word2vec.Word2Vec(sentences, size=100)
-      model = word2vec.Word2Vec(sentences, workers=6)
-      ## Store the model
-      model.save( MODEL_PATH )
-      logging.info('--- saved model (%s) based on %s'%(MODEL_PATH,DATASET) )
-    ## ================================== ##
-    ## Load Yahoo Datapack Corpus Dataset ##
-    DATASET = 'corpus/yahoo-datapack-20150103-1m.kw.adcopy'
-    MODEL_PATH = 'models/yahoo-datapack-20150103-1m-kw-adcopy.model'
-    logging.info('loading dataset [%s]' %DATASET)
-    if os.path.isfile(MODEL_PATH):
-      model = self.get_model( MODEL_PATH )
-      logging.info('\tdone [%s]' %MODEL_PATH)
-    else:
-      sentences = self.load_sentences_from_file(DATASET)
-      model.train(sentences)
-      ## Training
-      model = word2vec.Word2Vec(sentences, min_count=5)
-      model = word2vec.Word2Vec(sentences, size=100)
-      model = word2vec.Word2Vec(sentences, workers=6)
-      ## Store the model
-      model.save( MODEL_PATH )
-      logging.info('--- saved model (%s) based on %s'%(MODEL_PATH,DATASET) )
-      ##
-    return model
+      logging.info('--- updating model')
+      self.model.train(sentences)
+    #
+    ## Set model parameters
+    ## This is the dimension of the vector that will be build for each word.
+    ## The size of the NN layers correspond to the “degrees” of freedom the training algorithm has.
+    ## Bigger size values require more training data, but can lead to better (more accurate) models. 
+    ## Reasonable values are in the tens to hundreds.
+    self.model = word2vec.Word2Vec(sentences, size=size)
+    ## Set up Paralelization 
+    self.model = word2vec.Word2Vec(sentences, workers=workers) # default = 1 worker = no parallelization
     ##
 
 
@@ -113,8 +78,10 @@ class GensimCore:
     ## Loading and cleaning input file
     sentences = []
     n_words = 0
-    logging.info('loading Dataset %s' %file_path)
-    for line in open(file_path):
+    s = time()
+    tpast = 0
+    logging.info('loading dataset %s' %file_path)
+    for line in bz2.BZ2File(file_path):
       ## Get language
       lang = get_best_language(line.strip())
       ## Clean Text
@@ -126,46 +93,112 @@ class GensimCore:
       if len(l_words) > 0:
         sentences.append(l_words)
         n_words += len(l_words)
-    logging.info('loaded %d sentences with %d words'%(len(sentences),n_words) )
+      ## Stats Update
+      tstop = int(time()-s)
+      if tstop%60 == 0 and tpast!=tstop:
+        tpast = tstop
+        logging.info('loaded %d sentences with %d words   ~%.2f seconds'%(len(sentences),n_words,time()-s) )
+    logging.info('loaded %d sentences with %d words   ~%.2f seconds'%(len(sentences),n_words,time()-s) )
     return sentences
     ## 
 
 
-  ''' Evaluate the model. 
-      http://word2vec.googlecode.com/svn/trunk/questions-words.txt '''
-  def evaluate(self, eval_file_path='ext/evaluation-questions-words.txt'):
+  ''' Evaluate the model: http://word2vec.googlecode.com/svn/trunk/questions-words.txt '''
+  def evaluate(self, eval_file_path=''):
+    if eval_file_path == '':
+      eval_file_path = '%sext/evaluation-questions-words.txt'%self.path
     self.model.accuracy(eval_file_path)
+  ##
 
 
+  ''' Function to average all of the word vectors in a given paragraph '''
+  def makeFeatureVec(self, words, num_features):
+    # Pre-initialize an empty numpy array (for speed)
+    featureVec = np.zeros((num_features,),dtype="float32")
+    #
+    nwords = 0.
+    # 
+    # Index2word is a list that contains the names of the words in 
+    # the model's vocabulary. Convert it to a set, for speed 
+    index2word_set = set(self.model.index2word)
+    #
+    # Loop over each word in the review and, if it is in the model's
+    # vocaublary, add its feature vector to the total
+    for word in words:
+      if word in index2word_set: 
+        nwords = nwords + 1.
+        featureVec = np.add(featureVec,self.model[word])
+    # 
+    # Divide the result by the number of words to get the average
+    featureVec = np.divide(featureVec,nwords)
+    return featureVec
 
-gs = GensimCore()
-gs.evaluate()
 
-sys.exit()
+  ''' Given a set of reviews (each one a list of words), calculate 
+      the average feature vector for each one and return a 2D numpy array '''
+  def getAvgFeatureVecs(self, reviews, num_features):
+    # Initialize a counter
+    counter = 0.
+    # 
+    # Preallocate a 2D numpy array, for speed
+    reviewFeatureVecs = np.zeros((len(reviews),num_features),dtype="float32")
+    # 
+    # Loop through the reviews
+    for review in reviews:
+      #
+      # Print a status message every 1000th review
+      if counter%1000. == 0.:
+        print "Review %d of %d" % (counter, len(reviews))
+      # 
+      # Call the function (defined above) that makes average feature vectors
+      reviewFeatureVecs[counter] = makeFeatureVec(review, self.model, num_features)
+      #
+      # Increment the counter
+      counter = counter + 1.
+    return reviewFeatureVecs
+    ##
 
 
+  # ****************************************************************
+  # Calculate average feature vectors for given set of words.
+  # def computeFeature
+  # list_of_sentences = []
+  # data_vecs = self.getAvgFeatureVecs( clean_train_reviews, model, num_features )
+
+  ##
+##
 
 
-# ... and some hours later... just as advertised...
-model.most_similar(positive=['woman', 'king'], negative=['man'], topn=1)
-[('queen', 0.5359965)]
- 
-# pickle the entire model to disk, so we can load&resume training later
-model.save('/tmp/text8.model')
-# store the learned weights, in a format the original C tool understands
-model.save_word2vec_format('/tmp/text8.model.bin', binary=True)
-# or, import word weights created by the (faster) C word2vec
-# this way, you can switch between the C/Python toolkits easily
-model = word2vec.Word2Vec.load_word2vec_format('/tmp/vectors.bin', binary=True)
- 
-# "boy" is to "father" as "girl" is to ...?
-model.most_similar(['girl', 'father'], ['boy'], topn=3)
-more_examples = ["he his she", "big bigger bad", "going went being"]
-for example in more_examples:
-  a, b, x = example.split()
-  predicted = model.most_similar([x, b], [a])[0][0]
-  print "'%s' is to '%s' as '%s' is to '%s'" % (a, b, x, predicted)
- 
-# which word doesn't go with the others?
-model.doesnt_match("breakfast cereal dinner lunch".split())
-'cereal'
+# gs = GensimCore()
+# gs.load_model()
+
+
+def devel():
+  ##
+  ## Ho to use the word-vector to compare two sets of text.
+  ## https://www.kaggle.com/c/word2vec-nlp-tutorial/details/part-3-more-fun-with-word-vectors
+  model['king'] # returns the feature vector for that word
+
+  # ... and some hours later... just as advertised...
+  model.most_similar(positive=['woman', 'king'], negative=['man'], topn=1)
+  [('queen', 0.5359965)]
+   
+  # pickle the entire model to disk, so we can load&resume training later
+  model.save('/tmp/text8.model')
+  # store the learned weights, in a format the original C tool understands
+  model.save_word2vec_format('/tmp/text8.model.bin', binary=True)
+  # or, import word weights created by the (faster) C word2vec
+  # this way, you can switch between the C/Python toolkits easily
+  model = word2vec.Word2Vec.load_word2vec_format('/tmp/vectors.bin', binary=True)
+   
+  # "boy" is to "father" as "girl" is to ...?
+  model.most_similar(['girl', 'father'], ['boy'], topn=3)
+  more_examples = ["he his she", "big bigger bad", "going went being"]
+  for example in more_examples:
+    a, b, x = example.split()
+    predicted = model.most_similar([x, b], [a])[0][0]
+    print "'%s' is to '%s' as '%s' is to '%s'" % (a, b, x, predicted)
+   
+  # which word doesn't go with the others?
+  model.doesnt_match("breakfast cereal dinner lunch".split())
+  'cereal'
