@@ -30,15 +30,15 @@ class GensimCore:
     self.model = None
 
   def load_model(self, model_path):
-    logging.info('loading model [%s]' %model_path)
+    logging.info('--- loading model [%s]' %model_path)
     self.model = word2vec.Word2Vec.load( model_path )
     ##
 
-  def store_model(self, model_path, static=True):
+  def store_model(self, model_path, static=False):
     if static:
       self.model.init_sims(replace=True)
     self.model.save( model_path )
-    logging.info('--- saved model (%s)'%model_path)
+    logging.info('--- storing model (%s)'%model_path)
     ##
 
   ''' Load Sentences '''
@@ -52,6 +52,8 @@ class GensimCore:
         sentences = word2vec.Text8Corpus(CORPUS_PATH)## 
       else: # Load custom corpus
         sentences = self.load_sentences_from_file(CORPUS_PATH)
+    #
+    return sentences
     ##
 
   ''' Create a model from scratch '''
@@ -61,21 +63,12 @@ class GensimCore:
     self.model = word2vec.Word2Vec(sentences, size=size, min_count=min_count, workers=workers) 
     ##
 
-  ''' Create or update model with the given corpus. '''
-  def train_model(self, CORPUS_PATH, update=False, min_count=5, size=100, workers=6):
-    # load sentences
-    sentences = load_sentences(CORPUS_PATH)
-    #
-    ## Build or Update the model
+  ''' Update model with the given corpus. '''
+  def update_model(self, sentences, min_count=5, size=100, workers=6):
+    ## Update the model
     ## train the skip-gram model; default window=5 - min_count of words frequency
-    if self.model == None:
-      self.build_model( sentences, min_count=min_count, size=size, workers=workers )
-    elif update:
-      logging.info('--- updating model')
-      self.model.train(sentences)
-    else:
-      logging.info('[!] not clear what I have to do')
-      return
+    logging.info('--- updating model')
+    self.model.train( sentences )
     ##
 
 
