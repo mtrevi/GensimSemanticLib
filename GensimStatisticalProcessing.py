@@ -41,35 +41,41 @@ class GensimCore:
     logging.info('--- saved model (%s)'%model_path)
     ##
 
-
-  ''' Create or update model with the given corpus. '''
-  def train_model(self, CORPUS_PATH, update=False, min_count=5, size=100, workers=6):
+  ''' Load Sentences '''
+  def load_sentences(self, CORPUS_PATH):
     if not os.path.isfile(CORPUS_PATH):
       logging.error('[!] Corpus Not Found (%s)' %CORPUS_PATH)
       return
     else:
+      logging.info('--- loading sentences from %s' %CORPUS_PATH)
       if 'text8' in CORPUS_PATH: # Load standard text8 
         sentences = word2vec.Text8Corpus(CORPUS_PATH)## 
       else: # Load custom corpus
         sentences = self.load_sentences_from_file(CORPUS_PATH)
+    ##
+
+  ''' Create a model from scratch '''
+  def build_model(self, sentences, min_count=5, size=100, workers=6):
+    logging.info('--- building model')
+    logging.info('-- min_count: %d, size: %d, workers: %d' %(min_count,size,workers))
+    self.model = word2vec.Word2Vec(sentences, size=size, min_count=min_count, workers=workers) 
+    ##
+
+  ''' Create or update model with the given corpus. '''
+  def train_model(self, CORPUS_PATH, update=False, min_count=5, size=100, workers=6):
+    # load sentences
+    sentences = load_sentences(CORPUS_PATH)
     #
     ## Build or Update the model
+    ## train the skip-gram model; default window=5 - min_count of words frequency
     if self.model == None:
-      logging.info('--- building model')
-      ## train the skip-gram model; default window=5 - min_count of words frequency
-      self.model = word2vec.Word2Vec(sentences, min_count=min_count) 
-    else:
+      self.build_model( sentences, min_count=min_count, size=size, workers=workers )
+    elif update:
       logging.info('--- updating model')
       self.model.train(sentences)
-    #
-    ## Set model parameters
-    ## This is the dimension of the vector that will be build for each word.
-    ## The size of the NN layers correspond to the “degrees” of freedom the training algorithm has.
-    ## Bigger size values require more training data, but can lead to better (more accurate) models. 
-    ## Reasonable values are in the tens to hundreds.
-    self.model = word2vec.Word2Vec(sentences, size=size)
-    ## Set up Paralelization 
-    self.model = word2vec.Word2Vec(sentences, workers=workers) # default = 1 worker = no parallelization
+    else:
+      logging.info('[!] not clear what I have to do')
+      return
     ##
 
 
