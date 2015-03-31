@@ -1,0 +1,3 @@
+[submodule "ext/TextProcessingLib"]
+	path = ext/TextProcessingLib
+	url = https://github.com/xarabas/TextProcessingLib.git

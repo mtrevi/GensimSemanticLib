@@ -8,7 +8,7 @@ URL: http://radimrehurek.com/2014/02/word2vec-tutorial/
 ## import modules and set up logging
 # %load_ext autoreload
 # %autoreload 2
-from ext.TextProcessing import *
+from ext.TextProcessingLib.TextProcessing import *
 from gensim.models import word2vec
 from time import time
 import numpy as np
@@ -29,12 +29,18 @@ class GensimCore:
   def __init__(self):
     self.model = None
 
-  def load_model(self, model_path):
-    logging.info('--- loading model [%s]' %model_path)
-    self.model = word2vec.Word2Vec.load( model_path )
+  def load_model(self, model_path, binary=False):
+    if binary: # C binary format
+      logging.info('--- loading binary model [%s]' %model_path)
+      self.model = word2vec.Word2Vec.load_word2vec_format(model_path, binary=True)
+    else:
+      logging.info('--- loading model [%s]' %model_path)
+      self.model = word2vec.Word2Vec.load( model_path )
     ##
 
   def store_model(self, model_path, static=False):
+    # If you don't plan to train the model any further, calling 
+    # init_sims will make the model much more memory-efficient.
     if static:
       self.model.init_sims(replace=True)
     self.model.save( model_path )
@@ -56,15 +62,23 @@ class GensimCore:
     return sentences
     ##
 
-  ''' Create a model from scratch '''
-  def build_model(self, sentences, min_count=5, size=100, workers=6):
+  ''' Create a model from scratch. 
+    @param size = 300      # Word vector dimensionality                      
+    @param min_count = 40  # Minimum word count                        
+    @param workers = 4     # Number of threads to run in parallel
+    @param context = 10    # Context window size
+    @param downsampling = 1e-3   # Downsample setting for frequent words
+  '''
+  def build_model(self, sentences, min_count=5, size=100, workers=6, downsampling = 1e-3):
     logging.info('--- building model')
     logging.info('-- min_count: %d, size: %d, workers: %d' %(min_count,size,workers))
-    self.model = word2vec.Word2Vec(sentences, size=size, min_count=min_count, workers=workers) 
+    self.model = word2vec.Word2Vec( sentences, workers=workers,\
+                      size=size, min_count=min_count,  \
+                      window = context, sample = downsampling ) 
     ##
 
   ''' Update model with the given corpus. '''
-  def update_model(self, sentences, min_count=5, size=100, workers=6):
+  def update_model(self, sentences):
     ## Update the model
     ## train the skip-gram model; default window=5 - min_count of words frequency
     logging.info('--- updating model')
