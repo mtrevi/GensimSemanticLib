@@ -2,6 +2,14 @@
 
 This is a collection of methods that help to use right away the word2vector implementation in the Gensim python package.
 
+<h6>Dependences</h6>
+The external library [TextProcessingLib](https://github.com/xarabas/TextProcessingLib) is required. Import it in the following way:
+
+```
+git submodule add https://github.com/xarabas/TextProcessingLib.git ext/TextProcessingLib
+git submodule update --init --recursive
+```
+
 ------------
 <h3>Gensim Statistical Processing</h3>
 
