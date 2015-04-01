@@ -29,13 +29,14 @@ class GensimCore:
   def __init__(self):
     self.model = None
 
-  def load_model(self, model_path, binary=False):
-    if binary: # C binary format
-      logging.info('--- loading binary model [%s]' %model_path)
-      self.model = word2vec.Word2Vec.load_word2vec_format(model_path, binary=True)
-    else:
-      logging.info('--- loading model [%s]' %model_path)
+  def load_model(self, model_path, createdBy='gensim' binary=False):
+    if createdBy == 'gensim':
+      logging.info('--- loading model (gensim) [%s]' %model_path)
       self.model = word2vec.Word2Vec.load( model_path )
+    #
+    elif createdBy == 'google': # C binary format
+      logging.info('--- loading binary model (google) [%s]' %model_path)
+      self.model = word2vec.Word2Vec.load_word2vec_format(model_path, binary=binary)
     ##
 
   def store_model(self, model_path, static=False):
