@@ -14,7 +14,6 @@ from time import time
 import numpy as np
 import logging
 import sys
-import bz2
 import os
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 ##
@@ -29,7 +28,7 @@ class GensimCore:
   def __init__(self):
     self.model = None
 
-  def load_model(self, model_path, createdBy='gensim' binary=False):
+  def load_model(self, model_path, createdBy='gensim', binary=False):
     if createdBy == 'gensim':
       logging.info('--- loading model (gensim) [%s]' %model_path)
       self.model = word2vec.Word2Vec.load( model_path )
@@ -70,7 +69,7 @@ class GensimCore:
     @param context = 10    # Context window size
     @param downsampling = 1e-3   # Downsample setting for frequent words
   '''
-  def build_model(self, sentences, min_count=5, size=100, workers=6, downsampling = 1e-3):
+  def build_model(self, sentences, min_count=5, size=100, workers=6, downsampling=1e-3):
     logging.info('--- building model')
     logging.info('-- min_count: %d, size: %d, workers: %d' %(min_count,size,workers))
     self.model = word2vec.Word2Vec( sentences, workers=workers,\
@@ -95,7 +94,15 @@ class GensimCore:
     s = time()
     tpast = 0
     logging.info('loading dataset %s' %file_path)
-    for line in bz2.BZ2File(file_path):
+    if 'bz2' in file_path:
+      import bz2
+      FSTREAM = open( bz2.BZ2File(file_path), 'r' )
+    elif 'gz' in file_path:
+      import gzip
+      FSTREAM = open( gzip.open(file_path), 'r' )
+    else:
+      FSTREAM = open( file_path, 'r' )
+    for line in FSTREAM:
       ## Get language
       lang = get_best_language(line.strip())
       ## Clean Text
@@ -113,6 +120,7 @@ class GensimCore:
         tpast = tstop
         logging.info('loaded %d sentences with %d words   ~%.2f seconds'%(len(sentences),n_words,time()-s) )
     logging.info('loaded %d sentences with %d words   ~%.2f seconds'%(len(sentences),n_words,time()-s) )
+    FSTREAM.close()
     return sentences
     ## 
 
