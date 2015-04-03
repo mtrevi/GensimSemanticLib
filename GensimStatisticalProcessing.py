@@ -69,7 +69,8 @@ class GensimCore:
     @param context = 10    # Context window size
     @param downsampling = 1e-3   # Downsample setting for frequent words
   '''
-  def build_model(self, sentences, min_count=5, size=100, workers=6, downsampling=1e-3):
+  def build_model(self, sentences, \
+      min_count=5, size=100, workers=6, context=10, downsampling=1e-3):
     logging.info('--- building model')
     logging.info('-- min_count: %d, size: %d, workers: %d' %(min_count,size,workers))
     self.model = word2vec.Word2Vec( sentences, workers=workers,\
