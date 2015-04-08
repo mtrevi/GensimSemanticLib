@@ -48,7 +48,7 @@ class GensimCore:
     ##
 
   ''' Load Sentences '''
-  def load_sentences(self, CORPUS_PATH):
+  def load_sentences(self, CORPUS_PATH, keep_only_ascii=True):
     if not os.path.isfile(CORPUS_PATH):
       logging.error('[!] Corpus Not Found (%s)' %CORPUS_PATH)
       return
@@ -57,7 +57,7 @@ class GensimCore:
       if 'text8' in CORPUS_PATH: # Load standard text8 
         sentences = word2vec.Text8Corpus(CORPUS_PATH)## 
       else: # Load custom corpus
-        sentences = self.load_sentences_from_file(CORPUS_PATH)
+        sentences = self.load_sentences_from_file(CORPUS_PATH, keep_only_ascii=keep_only_ascii)
     #
     return sentences
     ##
@@ -88,7 +88,7 @@ class GensimCore:
 
 
   ''' Given a file path load and pre-process the sentences '''
-  def load_sentences_from_file(self, file_path, custom_stopwords=[]):
+  def load_sentences_from_file(self, file_path, keep_only_ascii=True, custom_stopwords=[]):
     ## Loading and cleaning input file
     sentences = []
     n_words = 0
@@ -104,10 +104,13 @@ class GensimCore:
     else:
       FSTREAM = open( file_path, 'r' )
     for line in FSTREAM:
+      text = line.strip()
       ## Get language
-      lang = get_best_language(line.strip())
+      lang = get_best_language(text)
       ## Clean Text
-      l_words = keep_only_ascii_chars(line.strip(),lower=True)
+      if keep_only_ascii:
+        text = keep_only_ascii_chars(text,lower=True)
+      l_words = tokenize2words(text)
       if len(custom_stopwords) > 0:
         l_words = remove_custom_stopwords(l_words, stopwords=custom_stopwords)
       ## Remove Stopwords
