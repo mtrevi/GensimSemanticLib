@@ -88,7 +88,7 @@ class GensimCore:
 
 
   ''' Given a file path load and pre-process the sentences '''
-  def load_sentences_from_file(self, file_path):
+  def load_sentences_from_file(self, file_path, custom_stopwords=[]):
     ## Loading and cleaning input file
     sentences = []
     n_words = 0
@@ -107,8 +107,9 @@ class GensimCore:
       ## Get language
       lang = get_best_language(line.strip())
       ## Clean Text
-      l_words = remove_punctuation_and_number(line.strip(),lower=True)
-      l_words = clean_as_keywords(l_words)
+      l_words = keep_only_ascii_chars(line.strip(),lower=True)
+      if len(custom_stopwords) > 0:
+        l_words = remove_custom_stopwords(l_words, stopwords=custom_stopwords)
       ## Remove Stopwords
       l_words = remove_stopwords(l_words,lang)
       ## Update list
