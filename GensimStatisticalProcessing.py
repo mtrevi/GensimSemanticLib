@@ -110,6 +110,8 @@ class GensimCore:
       ## Clean Text
       if keep_only_ascii:
         text = keep_only_ascii_chars(text,lower=True)
+      else:
+        text = text.lower()
       l_words = tokenize2words(text)
       if len(custom_stopwords) > 0:
         l_words = remove_custom_stopwords(l_words, stopwords=custom_stopwords)
